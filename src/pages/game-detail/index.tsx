@@ -5,30 +5,43 @@ import classnames from 'classnames'
 import styles from './index.module.scss'
 import StatusBadge from '@/components/StatusBadge'
 import TagBadge from '@/components/TagBadge'
-import { mockGames } from '@/data/games'
-import { currentUserId } from '@/data/members'
+import { useClubStore } from '@/store'
 import { formatDate } from '@/utils/format'
-import type { Game } from '@/types/game'
 
 const GameDetailPage: React.FC = () => {
   const router = useRouter()
   const gameId = router.params.id || 'g1'
 
-  const [game, setGame] = useState<Game>(() => {
-    return mockGames.find(g => g.id === gameId) || mockGames[0]
-  })
+  const games = useClubStore(s => s.games)
+  const currentUserId = useClubStore(s => s.currentUserId)
+  const isPresident = useClubStore(s => s.isPresident)
+  const signupToGame = useClubStore(s => s.signupToGame)
+  const cancelSignup = useClubStore(s => s.cancelSignup)
+  const moveWaitlistUp = useClubStore(s => s.moveWaitlistUp)
+  const moveWaitlistDown = useClubStore(s => s.moveWaitlistDown)
+  const promoteWaitlist = useClubStore(s => s.promoteWaitlist)
+
+  const game = useMemo(() => games.find(g => g.id === gameId), [games, gameId])
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([])
 
   const isConfirmed = useMemo(() => {
-    return game.participants.some(p => p.memberId === currentUserId)
-  }, [game])
+    return game?.participants.some(p => p.memberId === currentUserId) ?? false
+  }, [game, currentUserId])
 
   const isWaitlist = useMemo(() => {
-    return game.waitlist.some(p => p.memberId === currentUserId)
-  }, [game])
+    return game?.waitlist.some(p => p.memberId === currentUserId) ?? false
+  }, [game, currentUserId])
 
-  const isFull = game.currentPlayers >= game.totalPlayers
-  const progress = Math.min(100, (game.currentPlayers / game.totalPlayers) * 100)
+  const myWaitlistRank = useMemo(() => {
+    return game?.waitlist.find(p => p.memberId === currentUserId)?.waitlistRank
+  }, [game, currentUserId])
+
+  const isFull = (game?.currentPlayers ?? 0) >= (game?.totalPlayers ?? 0)
+  const progress = game ? Math.min(100, (game.currentPlayers / game.totalPlayers) * 100) : 0
+
+  if (!game) {
+    return <View className={styles.page}><Text style={{ padding: '100rpx', textAlign: 'center', color: '#86909C' }}>未找到该车辆</Text></View>
+  }
 
   const toggleTimeSlot = (slotId: string) => {
     console.log('[GameDetail] toggle time slot:', slotId)
@@ -45,17 +58,26 @@ const GameDetailPage: React.FC = () => {
       return
     }
 
-    console.log('[GameDetail] signup with time slots:', selectedTimeSlots)
+    const doSignup = () => {
+      const result = signupToGame(game.id, currentUserId, selectedTimeSlots)
+      console.log('[GameDetail] signup result:', result)
+      if (result.success) {
+        if (result.isWaitlist) {
+          Taro.showToast({ title: `候补第${result.waitlistRank}位`, icon: 'success' })
+        } else {
+          Taro.showToast({ title: '报名成功！', icon: 'success' })
+        }
+        setSelectedTimeSlots([])
+      }
+    }
 
     if (isFull) {
       Taro.showModal({
         title: '已报满，加入候补',
-        content: '当前车辆已满，是否加入候补队列？候补顺序将根据最近参车次数自动生成。',
+        content: '当前车辆已满，是否加入候补队列？\n\n候补排序规则：先按最近参车次数（少的优先），再结合角色匹配度（时间线/密码题专长），最后报名时间。社长可手动调整顺序。',
         confirmText: '加入候补',
         success: (res) => {
-          if (res.confirm) {
-            Taro.showToast({ title: '已加入候补队列', icon: 'success' })
-          }
+          if (res.confirm) doSignup()
         }
       })
     } else {
@@ -64,10 +86,7 @@ const GameDetailPage: React.FC = () => {
         content: `已选择 ${selectedTimeSlots.length} 个时间段，确认报名《${game.title}》？`,
         confirmText: '确认报名',
         success: (res) => {
-          if (res.confirm) {
-            Taro.showToast({ title: '报名成功！', icon: 'success' })
-            console.log('[GameDetail] signup confirmed')
-          }
+          if (res.confirm) doSignup()
         }
       })
     }
@@ -75,13 +94,45 @@ const GameDetailPage: React.FC = () => {
 
   const handleCancel = () => {
     Taro.showModal({
-      title: '取消报名',
-      content: '确定要取消本次报名吗？',
+      title: isConfirmed ? '取消报名' : '退出候补',
+      content: isConfirmed
+        ? '确定要取消本次报名吗？如有候补，首位候补将自动递补。'
+        : '确定要退出候补队列吗？',
       confirmText: '确定取消',
       confirmColor: '#F53F3F',
       success: (res) => {
         if (res.confirm) {
-          Taro.showToast({ title: '已取消报名', icon: 'none' })
+          cancelSignup(game.id, currentUserId)
+          Taro.showToast({ title: isConfirmed ? '已取消报名' : '已退出候补', icon: 'none' })
+        }
+      }
+    })
+  }
+
+  const handleMoveUp = (rank: number) => {
+    console.log('[GameDetail] moveWaitlistUp:', rank)
+    moveWaitlistUp(game.id, rank)
+  }
+
+  const handleMoveDown = (rank: number) => {
+    console.log('[GameDetail] moveWaitlistDown:', rank)
+    moveWaitlistDown(game.id, rank)
+  }
+
+  const handlePromote = (rank: number) => {
+    console.log('[GameDetail] promoteWaitlist:', rank)
+    if (game.currentPlayers >= game.totalPlayers) {
+      Taro.showToast({ title: '名额已满，无法提拔', icon: 'none' })
+      return
+    }
+    Taro.showModal({
+      title: '提拔为正式成员',
+      content: '确定将该候补社员提拔为正式成员吗？',
+      confirmText: '确认提拔',
+      success: (res) => {
+        if (res.confirm) {
+          promoteWaitlist(game.id, rank)
+          Taro.showToast({ title: '提拔成功', icon: 'success' })
         }
       }
     })
@@ -91,6 +142,8 @@ const GameDetailPage: React.FC = () => {
     console.log('[GameDetail] share game')
     Taro.showToast({ title: '分享功能开发中', icon: 'none' })
   }
+
+  const hasSlots = game.participants.length < game.totalPlayers
 
   return (
     <View className={styles.page}>
@@ -104,11 +157,7 @@ const GameDetailPage: React.FC = () => {
         <View className={styles.coverOverlay} />
         <StatusBadge status={game.status} className={styles.statusBadge} />
         <View className={styles.hostInfo}>
-          <Image
-            className={styles.hostAvatar}
-            src={game.host.avatar}
-            mode='aspectFill'
-          />
+          <Image className={styles.hostAvatar} src={game.host.avatar} mode='aspectFill' />
           <View>
             <Text className={styles.hostName}>{game.host.name}</Text>
             <Text className={styles.hostRole}>车头 · 组织者</Text>
@@ -198,6 +247,14 @@ const GameDetailPage: React.FC = () => {
           </View>
         )}
 
+        {isWaitlist && myWaitlistRank && (
+          <View style={{ background: 'rgba(255,125,0,0.08)', border: '1rpx solid rgba(255,125,0,0.2)', borderRadius: '16rpx', padding: '24rpx 32rpx', marginBottom: '24rpx' }}>
+            <Text style={{ color: '#FF7D00', fontSize: '28rpx', fontWeight: '600' }}>
+              🔄 当前候补第 {myWaitlistRank} 位
+            </Text>
+          </View>
+        )}
+
         <View className={styles.participantSection}>
           <View className={styles.infoSectionTitle}>
             <Text className={styles.infoSectionIcon}>👥</Text>
@@ -231,22 +288,44 @@ const GameDetailPage: React.FC = () => {
           <View className={styles.waitlistSection}>
             <View className={styles.waitlistHeader}>
               <Text className={styles.waitlistTitle}>🔄 候补队列 ({game.waitlist.length}人)</Text>
-              <Text className={styles.waitlistRule}>按参车次数排序</Text>
+              <Text className={styles.waitlistRule}>
+                {isPresident ? '社长模式 · 可调整顺序' : '按参车次数+专长排序'}
+              </Text>
+            </View>
+            <View className={styles.sortHint}>
+              排序规则：最近参车次数少的优先 → 时间线/密码题专长匹配 → 报名时间先后
             </View>
             {game.waitlist.map(p => (
               <View key={p.memberId} className={styles.waitlistItem}>
                 <View className={styles.waitlistRank}>#{p.waitlistRank}</View>
-                <Image
-                  className={styles.waitlistAvatar}
-                  src={p.member.avatar}
-                  mode='aspectFill'
-                />
+                <Image className={styles.waitlistAvatar} src={p.member.avatar} mode='aspectFill' />
                 <View className={styles.waitlistInfo}>
                   <Text className={styles.waitlistName}>{p.member.name}</Text>
                   <Text className={styles.waitlistMeta}>
                     近月参车 {p.member.recentSessionCount} 次 · {p.timeSlots.length}个时间可到
                   </Text>
                 </View>
+                {isPresident && (
+                  <View className={styles.waitlistActions}>
+                    <View
+                      className={classnames(styles.waitlistActionBtn, (p.waitlistRank || 1) <= 1 && styles.disabled)}
+                      onClick={() => (p.waitlistRank || 1) > 1 && handleMoveUp(p.waitlistRank!)}
+                    >
+                      ↑
+                    </View>
+                    <View
+                      className={classnames(styles.waitlistActionBtn, (p.waitlistRank || 0) >= game.waitlist.length && styles.disabled)}
+                      onClick={() => (p.waitlistRank || 0) < game.waitlist.length && handleMoveDown(p.waitlistRank!)}
+                    >
+                      ↓
+                    </View>
+                    {hasSlots && (
+                      <View className={styles.promoteBtn} onClick={() => handlePromote(p.waitlistRank!)}>
+                        提拔
+                      </View>
+                    )}
+                  </View>
+                )}
               </View>
             ))}
           </View>
@@ -289,10 +368,7 @@ const GameDetailPage: React.FC = () => {
             {isConfirmed ? '取消报名' : '退出候补'}
           </Button>
         ) : (
-          <Button
-            className={classnames(styles.primaryBtn)}
-            onClick={handleSignup}
-          >
+          <Button className={styles.primaryBtn} onClick={handleSignup}>
             {isFull ? '加入候补队列' : '一键报名'}
           </Button>
         )}

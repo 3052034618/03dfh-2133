@@ -3,6 +3,7 @@ import { View, Text, Input, Textarea, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import classnames from 'classnames'
 import styles from './index.module.scss'
+import { useClubStore } from '@/store'
 import type { GameType } from '@/types/member'
 
 const gameTypes: GameType[] = [
@@ -16,6 +17,8 @@ interface TimeSlotForm {
 }
 
 const PublishGamePage: React.FC = () => {
+  const addGame = useClubStore(s => s.addGame)
+
   const [title, setTitle] = useState('')
   const [selectedType, setSelectedType] = useState<GameType | ''>('')
   const [totalPlayers, setTotalPlayers] = useState(6)
@@ -77,19 +80,27 @@ const PublishGamePage: React.FC = () => {
       return
     }
 
-    console.log('[PublishGame] submit form:', {
-      title, selectedType, totalPlayers, location, aaFee,
-      sessionDate, readingRequirement, noSpoilerNotice, description, timeSlots
-    })
-
     Taro.showModal({
       title: '确认发布',
       content: `确认发布《${title}》？发布后将在首页展示。`,
       confirmText: '确认发布',
       success: (res) => {
         if (res.confirm) {
+          console.log('[PublishGame] submit to store')
+          addGame({
+            title,
+            type: selectedType as GameType,
+            totalPlayers,
+            location,
+            aaFee: parseInt(aaFee) || 0,
+            readingRequirement,
+            noSpoilerNotice,
+            availableTimeSlots: validTimeSlots,
+            sessionDate,
+            description
+          })
           Taro.showToast({ title: '发布成功！', icon: 'success' })
-          setTimeout(() => Taro.navigateBack(), 1000)
+          setTimeout(() => Taro.navigateBack(), 800)
         }
       }
     })

@@ -373,6 +373,61 @@
   margin-top: 4rpx;
 }
 
+.waitlistActions {
+  display: flex;
+  gap: $spacing-xs;
+  flex-shrink: 0;
+}
+
+.waitlistActionBtn {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: $radius-round;
+  background: rgba(107, 78, 255, 0.08);
+  color: $color-primary;
+  font-size: $font-size-sm;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-fast;
+
+  &:active {
+    background: rgba(107, 78, 255, 0.2);
+  }
+
+  &.disabled {
+    background: $color-bg-hover;
+    color: $color-text-disabled;
+  }
+}
+
+.promoteBtn {
+  width: auto;
+  padding: 0 16rpx;
+  background: rgba(0, 180, 42, 0.1);
+  color: $color-success;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  border-radius: $radius-sm;
+  margin-left: $spacing-sm;
+  height: 48rpx;
+
+  &:active {
+    background: rgba(0, 180, 42, 0.2);
+  }
+}
+
+.sortHint {
+  background: rgba(107, 78, 255, 0.06);
+  border: 1rpx solid rgba(107, 78, 255, 0.2);
+  border-radius: $radius-sm;
+  padding: $spacing-sm $spacing-md;
+  margin-top: $spacing-sm;
+  font-size: $font-size-xs;
+  color: $color-text-secondary;
+  line-height: 1.6;
+}
+
 .reminderCard {
   background: linear-gradient(135deg, rgba(0, 180, 42,0.08) 0%, rgba(0, 180, 42, 0.02) 100%);
   border: 1rpx solid rgba(0, 180, 42, 0.2);

@@ -4,17 +4,18 @@ import Taro, { usePullDownRefresh } from '@tarojs/taro'
 import classnames from 'classnames'
 import styles from './index.module.scss'
 import MemberCard from '@/components/MemberCard'
-import { mockMembers } from '@/data/members'
-import type { Member, PlayCountLevel, GameType } from '@/types/member'
+import { useClubStore } from '@/store'
+import type { PlayCountLevel, GameType } from '@/types/member'
 
 type AbilityFilter = 'timelineExpert' | 'cipherExpert' | 'canLongSession' | 'goodForNewbies' | 'goodForHardcore'
 
 const MembersPage: React.FC = () => {
   const [searchText, setSearchText] = useState('')
-  const [members, setMembers] = useState<Member[]>(mockMembers)
   const [selectedAbility, setSelectedAbility] = useState<AbilityFilter | null>(null)
   const [selectedLevel, setSelectedLevel] = useState<PlayCountLevel | 'all'>('all')
   const [selectedType, setSelectedType] = useState<GameType | 'all'>('all')
+
+  const members = useClubStore(s => s.members)
 
   const abilityFilters: { key: AbilityFilter; label: string }[] = [
     { key: 'timelineExpert', label: '时间线达人' },
@@ -72,9 +73,8 @@ const MembersPage: React.FC = () => {
   usePullDownRefresh(() => {
     console.log('[Members] pull down refresh')
     setTimeout(() => {
-      setMembers([...mockMembers])
       Taro.stopPullDownRefresh()
-    }, 800)
+    }, 500)
   })
 
   const handleAbilityClick = (key: AbilityFilter) => {

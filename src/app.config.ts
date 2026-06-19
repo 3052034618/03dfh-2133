@@ -4,7 +4,8 @@ export default defineAppConfig({
     'pages/members/index',
     'pages/profile/index',
     'pages/game-detail/index',
-    'pages/publish-game/index'
+    'pages/publish-game/index',
+    'pages/edit-profile/index'
   ],
   window: {
     backgroundTextStyle: 'light',

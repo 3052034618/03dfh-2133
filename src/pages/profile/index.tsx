@@ -3,17 +3,16 @@ import { View, Text, Image, Button } from '@tarojs/components'
 import Taro from '@tarojs/taro'
 import classnames from 'classnames'
 import styles from './index.module.scss'
-import { mockMembers, currentUserId } from '@/data/members'
-import { mockGames } from '@/data/games'
+import { useClubStore } from '@/store'
 import { formatPlayCountLevel } from '@/utils/format'
 
 const ProfilePage: React.FC = () => {
-  const currentMember = useMemo(() => {
-    return mockMembers.find(m => m.id === currentUserId) || mockMembers[0]
-  }, [])
+  const currentMember = useClubStore(s => s.getCurrentMember())
+  const games = useClubStore(s => s.games)
+  const currentUserId = useClubStore(s => s.currentUserId)
 
   const myBookings = useMemo(() => {
-    return mockGames.filter(g => {
+    return games.filter(g => {
       return g.participants.some(p => p.memberId === currentUserId) ||
         g.waitlist.some(p => p.memberId === currentUserId)
     }).map(g => {
@@ -25,9 +24,10 @@ const ProfilePage: React.FC = () => {
         waitlistRank: inWaitlist?.waitlistRank
       }
     })
-  }, [currentUserId])
+  }, [games, currentUserId])
 
   const abilityTags = useMemo(() => {
+    if (!currentMember) return []
     const tags: string[] = []
     if (currentMember.ability.timelineExpert) tags.push('时间线达人')
     if (currentMember.ability.cipherExpert) tags.push('密码破解')
@@ -38,8 +38,8 @@ const ProfilePage: React.FC = () => {
   }, [currentMember])
 
   const handleEditProfile = () => {
-    console.log('[Profile] edit profile')
-    Taro.showToast({ title: '编辑功能开发中', icon: 'none' })
+    console.log('[Profile] navigate to edit profile')
+    Taro.navigateTo({ url: '/pages/edit-profile/index' })
   }
 
   const handleViewHistory = () => {
@@ -50,6 +50,10 @@ const ProfilePage: React.FC = () => {
   const handleGameClick = (gameId: string) => {
     console.log('[Profile] navigate to game detail:', gameId)
     Taro.navigateTo({ url: `/pages/game-detail/index?id=${gameId}` })
+  }
+
+  if (!currentMember) {
+    return <View className={styles.page} />
   }
 
   return (

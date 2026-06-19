@@ -4,14 +4,14 @@ import Taro, { usePullDownRefresh } from '@tarojs/taro'
 import classnames from 'classnames'
 import styles from './index.module.scss'
 import GameCard from '@/components/GameCard'
-import { mockGames } from '@/data/games'
-import type { Game, GameStatus } from '@/types/game'
+import { useClubStore } from '@/store'
+import type { GameStatus } from '@/types/game'
 
 type TabType = 'all' | GameStatus
 
 const HomePage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>('all')
-  const [games, setGames] = useState<Game[]>(mockGames)
+  const games = useClubStore(s => s.games)
 
   const tabs: { key: TabType; label: string }[] = [
     { key: 'all', label: '全部' },
@@ -34,9 +34,8 @@ const HomePage: React.FC = () => {
   usePullDownRefresh(() => {
     console.log('[Home] pull down refresh')
     setTimeout(() => {
-      setGames([...mockGames])
       Taro.stopPullDownRefresh()
-    }, 800)
+    }, 500)
   })
 
   const handlePublish = () => {
@@ -86,7 +85,7 @@ const HomePage: React.FC = () => {
         <View className={styles.noticeContent}>
           <Text className={styles.noticeTitle}>社团公告</Text>
           <Text className={styles.noticeText}>
-            本周末共5场硬核本等你来！新社员首次参车立减10元，欢迎带同学入坑～
+            本周末共{stats.total}场硬核本等你来！新社员首次参车立减10元，欢迎带同学入坑～
           </Text>
         </View>
       </View>
