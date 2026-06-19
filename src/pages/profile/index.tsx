@@ -19,7 +19,7 @@ const ProfilePage: React.FC = () => {
   const currentMember = useClubStore(s => s.getCurrentMember())
   const games = useClubStore(s => s.games)
   const currentUserId = useClubStore(s => s.currentUserId)
-  const getMyNotifications = useClubStore(s => s.getMyNotifications)
+  const notifications = useClubStore(s => s.notifications)
   const markAllNotificationsRead = useClubStore(s => s.markAllNotificationsRead)
   const markNotificationRead = useClubStore(s => s.markNotificationRead)
   const getUnreadCount = useClubStore(s => s.getUnreadCount)
@@ -56,11 +56,11 @@ const ProfilePage: React.FC = () => {
     return tags
   }, [currentMember])
 
-  const unreadCount = useMemo(() => getUnreadCount(), [getUnreadCount])
+  const unreadCount = useMemo(() => getUnreadCount(), [notifications])
 
   const myNotifications = useMemo(() => {
-    return getMyNotifications()
-  }, [getMyNotifications, games])
+    return notifications.filter(n => n.memberId === currentUserId).slice(0, 10)
+  }, [notifications, currentUserId])
 
   const formatNotificationTime = (isoStr: string) => {
     const date = new Date(isoStr)
@@ -101,17 +101,7 @@ const ProfilePage: React.FC = () => {
 
   const handleClearAllRead = () => {
     if (unreadCount === 0) return
-    Taro.showModal({
-      title: '标记全部已读',
-      content: '确定将所有消息标记为已读吗？',
-      confirmText: '确认',
-      success: (res) => {
-        if (res.confirm) {
-          markAllNotificationsRead()
-          Taro.showToast({ title: '已全部标记为已读', icon: 'success' })
-        }
-      }
-    })
+    markAllNotificationsRead()
   }
 
   if (!currentMember) {

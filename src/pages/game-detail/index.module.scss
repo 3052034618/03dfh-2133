@@ -522,6 +522,281 @@
   background: $color-warning;
 }
 
+.scheduleTable {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-md;
+}
+
+.scheduleRow {
+  background: $color-bg-hover;
+  border-radius: $radius-md;
+  padding: $spacing-md;
+}
+
+.scheduleRowHeader {
+  display: flex;
+  align-items: center;
+  gap: 8rpx;
+  margin-bottom: $spacing-sm;
+}
+
+.scheduleRoleIcon {
+  font-size: $font-size-md;
+}
+
+.scheduleRoleName {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  font-weight: $font-weight-semibold;
+  flex: 1;
+}
+
+.scheduleRoleCount {
+  font-size: $font-size-sm;
+  font-weight: $font-weight-bold;
+
+  &.full {
+    color: $color-success;
+  }
+
+  &.need {
+    color: $color-warning;
+  }
+}
+
+.scheduleSlots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: $spacing-sm;
+}
+
+.scheduleSlot {
+  flex: 0 0 auto;
+}
+
+.scheduleSlotFilled {
+  display: flex;
+  align-items: center;
+  background: $color-bg-card;
+  border-radius: $radius-round;
+  padding: 8rpx 16rpx 8rpx 8rpx;
+  border: 2rpx solid rgba(0, 180, 42, 0.3);
+}
+
+.scheduleSlotAvatar {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: $radius-round;
+  margin-right: 8rpx;
+  background: $color-bg-hover;
+}
+
+.scheduleSlotName {
+  font-size: $font-size-xs;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.scheduleSlotTag {
+  font-size: 20rpx;
+  color: $color-primary;
+  margin-left: 8rpx;
+  padding: 2rpx 8rpx;
+  background: rgba(107, 78, 255, 0.08);
+  border-radius: $radius-round;
+}
+
+.scheduleSlotEmpty {
+  display: flex;
+  align-items: center;
+  background: rgba(255, 125, 0, 0.06);
+  border-radius: $radius-round;
+  padding: 8rpx 16rpx;
+  border: 2rpx dashed rgba(255, 125, 0, 0.3);
+}
+
+.scheduleSlotEmptyIcon {
+  font-size: $font-size-sm;
+  color: $color-warning;
+  margin-right: 4rpx;
+  font-weight: $font-weight-bold;
+}
+
+.scheduleSlotEmptyText {
+  font-size: $font-size-xs;
+  color: $color-warning;
+}
+
+.scheduleGapHint {
+  margin-top: $spacing-sm;
+  padding: 8rpx 12rpx;
+  background: rgba(255, 125, 0, 0.06);
+  border-radius: $radius-sm;
+}
+
+.recommendSection {
+  background: $color-bg-card;
+  border-radius: $radius-md;
+  margin-bottom: $spacing-lg;
+  box-shadow: $shadow-card;
+  overflow: hidden;
+}
+
+.recommendHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: $spacing-lg;
+  cursor: pointer;
+
+  &:active {
+    background: $color-bg-hover;
+  }
+}
+
+.recommendHeaderLeft {
+  display: flex;
+  align-items: center;
+}
+
+.recommendHeaderIcon {
+  margin-right: 8rpx;
+  font-size: $font-size-md;
+}
+
+.recommendHeaderTitle {
+  font-size: $font-size-md;
+  font-weight: $font-weight-semibold;
+  color: $color-text-primary;
+}
+
+.recommendCount {
+  background: $color-primary;
+  color: $color-text-white;
+  font-size: 20rpx;
+  font-weight: $font-weight-bold;
+  padding: 2rpx 12rpx;
+  border-radius: $radius-round;
+  margin-left: 8rpx;
+}
+
+.recommendToggle {
+  font-size: $font-size-xs;
+  color: $color-primary;
+}
+
+.recommendList {
+  padding: 0 $spacing-lg $spacing-lg;
+}
+
+.recommendItem {
+  display: flex;
+  align-items: center;
+  padding: $spacing-sm 0;
+  border-bottom: 1rpx solid $color-divider;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.recommendRank {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: $radius-round;
+  background: rgba(107, 78, 255, 0.1);
+  color: $color-primary;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-semibold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: $spacing-sm;
+  flex-shrink: 0;
+}
+
+.recommendAvatar {
+  width: 64rpx;
+  height: 64rpx;
+  border-radius: $radius-round;
+  margin-right: $spacing-sm;
+  background: $color-bg-hover;
+  flex-shrink: 0;
+}
+
+.recommendInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.recommendName {
+  font-size: $font-size-sm;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+  margin-bottom: 6rpx;
+}
+
+.recommendReasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6rpx;
+}
+
+.recommendReason {
+  padding: 4rpx 12rpx;
+  border-radius: $radius-round;
+  font-size: 20rpx;
+  background: rgba(0, 0, 0, 0.04);
+  color: $color-text-secondary;
+
+  &.primary {
+    background: rgba(107, 78, 255, 0.1);
+    color: $color-primary;
+    font-weight: $font-weight-medium;
+  }
+}
+
+.recommendPromoteBtn {
+  width: auto;
+  padding: 0 20rpx;
+  background: rgba(0, 180, 42, 0.1);
+  color: $color-success;
+  font-size: $font-size-xs;
+  font-weight: $font-weight-medium;
+  border-radius: $radius-sm;
+  height: 52rpx;
+  display: flex;
+  align-items: center;
+  margin-left: $spacing-sm;
+  flex-shrink: 0;
+
+  &:active {
+    background: rgba(0, 180, 42, 0.2);
+  }
+}
+
+.waitlistReasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6rpx;
+  margin-top: 6rpx;
+}
+
+.waitlistReasonTag {
+  padding: 2rpx 10rpx;
+  border-radius: $radius-round;
+  font-size: 20rpx;
+  background: rgba(0, 0, 0, 0.04);
+  color: $color-text-tertiary;
+
+  &.primary {
+    background: rgba(107, 78, 255, 0.1);
+    color: $color-primary;
+    font-weight: $font-weight-medium;
+  }
+}
+
 .timeConfirmSection {
   background: $color-bg-card;
   border-radius: $radius-md;

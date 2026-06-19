@@ -52,6 +52,93 @@ export const getFilledRoleCounts = (participants: Participant[], requirements: R
   return filled as Record<RoleType, number>
 }
 
+export interface RoleSlotAssignment {
+  roleType: RoleType
+  roleLabel: string
+  index: number
+  participant: Participant | null
+}
+
+export const getRoleSchedule = (
+  participants: Participant[],
+  requirements: RoleRequirement[]
+): RoleSlotAssignment[] => {
+  const assignments: RoleSlotAssignment[] = []
+  const usedMemberIds = new Set<string>()
+
+  for (const req of requirements) {
+    const matched: Participant[] = []
+    for (const p of participants) {
+      if (usedMemberIds.has(p.memberId)) continue
+      if (getRoleMatchScore(p.member, req.type) > 0) {
+        matched.push(p)
+      }
+    }
+    matched.sort((a, b) => {
+      if (a.role === '车头') return -1
+      if (b.role === '车头') return 1
+      return 0
+    })
+    for (let i = 0; i < req.count; i++) {
+      const p = matched[i]
+      if (p) usedMemberIds.add(p.memberId)
+      assignments.push({
+        roleType: req.type,
+        roleLabel: req.label,
+        index: i,
+        participant: p || null
+      })
+    }
+  }
+
+  return assignments
+}
+
+export interface PromotionRecommendation {
+  participant: Participant
+  rank: number
+  reasons: string[]
+  matchedGap?: RoleType
+  canArriveConfirmedTime: boolean
+}
+
+export const getRecommendPromotion = (
+  game: Game
+): PromotionRecommendation[] => {
+  if (game.waitlist.length === 0) return []
+  const gapCounts = computeGapCounts(game.participants, game.roleRequirements)
+  const confirmedTimeSlotId = game.confirmedTimeSlotId
+
+  return game.waitlist.map((p, idx) => {
+    const reasons: string[] = []
+    const matchedGap = getBestMatchedRoleForGap(p.member, game.roleRequirements, gapCounts)
+    const canArrive = confirmedTimeSlotId ? p.timeSlots.includes(confirmedTimeSlotId) : false
+
+    if (matchedGap) {
+      reasons.push(`匹配${game.roleRequirements.find(r => r.type === matchedGap)?.label || '缺口'}`)
+    }
+    if (p.member.recentSessionCount === 0) {
+      reasons.push('本月未参车')
+    } else if (p.member.recentSessionCount <= 1) {
+      reasons.push('参车少')
+    }
+    if (canArrive) {
+      reasons.push('可到确认时间')
+    }
+    if (p.member.ability.timelineExpert) reasons.push('时间线达人')
+    if (p.member.ability.cipherExpert) reasons.push('密码破解')
+    if (p.member.note.goodForNewbies) reasons.push('适合带新')
+
+    return {
+      participant: p,
+      rank: idx + 1,
+      reasons,
+      matchedGap,
+      canArriveConfirmedTime: canArrive
+    }
+  })
+}
+
 const getBestMatchedRoleForGap = (
   member: Member,
   requirements: RoleRequirement[],

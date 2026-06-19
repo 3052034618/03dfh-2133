@@ -5,7 +5,7 @@ import classnames from 'classnames'
 import styles from './index.module.scss'
 import StatusBadge from '@/components/StatusBadge'
 import TagBadge from '@/components/TagBadge'
-import { useClubStore, getFilledRoleCounts, getBestMatchedRole } from '@/store'
+import { useClubStore, getFilledRoleCounts, getBestMatchedRole, getRoleSchedule, getRecommendPromotion } from '@/store'
 import { formatDate } from '@/utils/format'
 import type { RoleType, TimeSlot } from '@/types/game'
 
@@ -14,6 +14,13 @@ const roleLabels: Record<RoleType, string> = {
   cipher: '密码题位',
   mentor: '带新位',
   hardcore: '硬核推理位'
+}
+
+const roleIcons: Record<RoleType, string> = {
+  timeline: '🕐',
+  cipher: '🔐',
+  mentor: '🎓',
+  hardcore: '🧠'
 }
 
 const GameDetailPage: React.FC = () => {
@@ -33,6 +40,7 @@ const GameDetailPage: React.FC = () => {
   const game = useMemo(() => games.find(g => g.id === gameId), [games, gameId])
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([])
   const [selectedConfirmTime, setSelectedConfirmTime] = useState<string | null>(null)
+  const [showRecommendPanel, setShowRecommendPanel] = useState(false)
 
   const isConfirmed = useMemo(() => {
     return game?.participants.some(p => p.memberId === currentUserId) ?? false
@@ -49,9 +57,19 @@ const GameDetailPage: React.FC = () => {
   const isFull = (game?.currentPlayers ?? 0) >= (game?.totalPlayers ?? 0)
   const progress = game ? Math.min(100, (game.currentPlayers / game.totalPlayers) * 100) : 0
 
+  const roleSchedule = useMemo(() => {
+    if (!game) return []
+    return getRoleSchedule(game.participants, game.roleRequirements)
+  }, [game])
+
   const roleFilledCounts = useMemo(() => {
     if (!game) return {} as Record<RoleType, number>
     return getFilledRoleCounts(game.participants, game.roleRequirements)
+  }, [game])
+
+  const recommendations = useMemo(() => {
+    if (!game) return []
+    return getRecommendPromotion(game)
   }, [game])
 
   const timeSlotCounts = useMemo(() => {
@@ -101,7 +119,7 @@ const GameDetailPage: React.FC = () => {
     if (isFull) {
       Taro.showModal({
         title: '已报满，加入候补',
-        content: '当前车辆已满，是否加入候补队列？\n\n候补排序规则：先按最近参车次数（少的优先），再结合角色匹配度（时间线/密码题专长），最后报名时间。社长可手动调整顺序。',
+        content: '当前车辆已满，是否加入候补队列？\n\n候补排序规则：先按最近参车次数（少的优先），再结合角色缺口匹配度，最后报名时间。社长可手动调整顺序。',
         confirmText: '加入候补',
         success: (res) => {
           if (res.confirm) doSignup()
@@ -123,7 +141,7 @@ const GameDetailPage: React.FC = () => {
     Taro.showModal({
       title: isConfirmed ? '取消报名' : '退出候补',
       content: isConfirmed
-        ? '确定要取消本次报名吗？如有候补，首位候补将自动递补。'
+        ? '确定要取消本次报名吗？如有候补，系统将推荐最合适的人选递补。'
         : '确定要退出候补队列吗？',
       confirmText: '确定取消',
       confirmColor: '#F53F3F',
@@ -152,9 +170,12 @@ const GameDetailPage: React.FC = () => {
       Taro.showToast({ title: '名额已满，无法提拔', icon: 'none' })
       return
     }
+    const target = game.waitlist.find(p => p.waitlistRank === rank)
+    const rec = recommendations.find(r => r.rank === rank)
+    const reasonText = rec && rec.reasons.length > 0 ? `\n\n推荐理由：${rec.reasons.join('、')}` : ''
     Taro.showModal({
       title: '提拔为正式成员',
-      content: '确定将该候补社员提拔为正式成员吗？',
+      content: `确定将 ${target?.member.name || '该候补社员'} 提拔为正式成员吗？${reasonText}`,
       confirmText: '确认提拔',
       success: (res) => {
         if (res.confirm) {
@@ -275,38 +296,115 @@ const GameDetailPage: React.FC = () => {
           <View className={styles.roleRequirementSection}>
             <View className={styles.roleRequirementTitle}>
               <Text className={styles.roleRequirementTitleIcon}>🎯</Text>
-              角色需求配置
+              角色排班表
             </View>
             <Text style={{ fontSize: '24rpx', color: '#86909C', marginBottom: '24rpx', display: 'block' }}>
-              以下是该车需要的角色类型，匹配对应专长的社员在候补排序中会优先
+              按报名人真实能力自动匹配，显示每个角色位由谁顶上
             </Text>
-            <View className={styles.roleList}>
+            <View className={styles.scheduleTable}>
               {game.roleRequirements.map(req => {
+                const slots = roleSchedule.filter(s => s.roleType === req.type)
                 const filled = roleFilledCounts[req.type] || 0
-                const need = req.count
-                const isFullRole = filled >= need
-                const percent = Math.min(100, (filled / need) * 100)
+                const gap = req.count - filled
                 return (
-                  <View key={req.type} className={styles.roleItem}>
-                    <View className={styles.roleItemInfo}>
-                      <Text className={styles.roleItemName}>{req.label}</Text>
-                      <Text className={styles.roleItemDesc}>{req.description}</Text>
-                    </View>
-                    <View className={styles.roleItemProgress}>
-                      <Text className={classnames(styles.roleItemCount, isFullRole ? 'full' : 'need')}>
-                        {filled}/{need}人
+                  <View key={req.type} className={styles.scheduleRow}>
+                    <View className={styles.scheduleRowHeader}>
+                      <Text className={styles.scheduleRoleIcon}>{roleIcons[req.type]}</Text>
+                      <Text className={styles.scheduleRoleName}>{req.label}</Text>
+                      <Text className={classnames(styles.scheduleRoleCount, gap > 0 ? 'need' : 'full')}>
+                        {filled}/{req.count}
                       </Text>
-                      <View className={styles.roleProgressBar}>
-                        <View
-                          className={classnames(styles.roleProgressFill, !isFullRole && 'need')}
-                          style={{ width: `${percent}%` }}
-                        />
-                      </View>
                     </View>
+                    <View className={styles.scheduleSlots}>
+                      {slots.map(slot => (
+                        <View key={`${req.type}-${slot.index}`} className={styles.scheduleSlot}>
+                          {slot.participant ? (
+                            <View className={styles.scheduleSlotFilled}>
+                              <Image
+                                className={styles.scheduleSlotAvatar}
+                                src={slot.participant.member.avatar}
+                                mode='aspectFill'
+                              />
+                              <Text className={styles.scheduleSlotName}>{slot.participant.member.name}</Text>
+                              {slot.participant.role && (
+                                <Text className={styles.scheduleSlotTag}>{slot.participant.role}</Text>
+                              )}
+                            </View>
+                          ) : (
+                            <View className={styles.scheduleSlotEmpty}>
+                              <Text className={styles.scheduleSlotEmptyIcon}>+</Text>
+                              <Text className={styles.scheduleSlotEmptyText}>缺人</Text>
+                            </View>
+                          )}
+                        </View>
+                      ))}
+                    </View>
+                    {gap > 0 && (
+                      <View className={styles.scheduleGapHint}>
+                        <Text style={{ fontSize: '22rpx', color: '#FF7D00' }}>
+                          ⚠️ 还缺 {gap} 人，候补中优先匹配{req.label}
+                        </Text>
+                      </View>
+                    )}
                   </View>
                 )
               })}
             </View>
+          </View>
+        )}
+
+        {isPresident && game.waitlist.length > 0 && (
+          <View className={styles.recommendSection}>
+            <View
+              className={styles.recommendHeader}
+              onClick={() => setShowRecommendPanel(!showRecommendPanel)}
+            >
+              <View className={styles.recommendHeaderLeft}>
+                <Text className={styles.recommendHeaderIcon}>💡</Text>
+                <Text className={styles.recommendHeaderTitle}>推荐补位</Text>
+                {recommendations.length > 0 && (
+                  <View className={styles.recommendCount}>{recommendations.length}</View>
+                )}
+              </View>
+              <Text className={styles.recommendToggle}>
+                {showRecommendPanel ? '收起 ▲' : '展开 ▼'}
+              </Text>
+            </View>
+            {showRecommendPanel && (
+              <View className={styles.recommendList}>
+                <Text style={{ fontSize: '22rpx', color: '#86909C', marginBottom: '16rpx', display: 'block' }}>
+                  系统根据角色缺口匹配、参车次数、可到时间综合推荐
+                </Text>
+                {recommendations.map(rec => (
+                  <View key={rec.participant.memberId} className={styles.recommendItem}>
+                    <View className={styles.recommendRank}>#{rec.rank}</View>
+                    <Image
+                      className={styles.recommendAvatar}
+                      src={rec.participant.member.avatar}
+                      mode='aspectFill'
+                    />
+                    <View className={styles.recommendInfo}>
+                      <Text className={styles.recommendName}>{rec.participant.member.name}</Text>
+                      <View className={styles.recommendReasons}>
+                        {rec.reasons.map((reason, idx) => (
+                          <View key={idx} className={classnames(styles.recommendReason, rec.matchedGap && idx === 0 && 'primary')}>
+                            {reason}
+                          </View>
+                        ))}
+                      </View>
+                    </View>
+                    {hasSlots && (
+                      <View
+                        className={styles.recommendPromoteBtn}
+                        onClick={() => handlePromote(rec.rank)}
+                      >
+                        提拔
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
         )}
 
@@ -438,42 +536,53 @@ const GameDetailPage: React.FC = () => {
               </Text>
             </View>
             <View className={styles.sortHint}>
-              排序规则：最近参车次数少的优先 → 角色需求匹配 → 时间线/密码题专长 → 报名时间先后
+              排序规则：最近参车次数少的优先 → 缺口角色匹配优先 → 专长加权 → 报名时间先后
             </View>
-            {game.waitlist.map(p => (
-              <View key={p.memberId} className={styles.waitlistItem}>
-                <View className={styles.waitlistRank}>#{p.waitlistRank}</View>
-                <Image className={styles.waitlistAvatar} src={p.member.avatar} mode='aspectFill' />
-                <View className={styles.waitlistInfo}>
-                  <Text className={styles.waitlistName}>{p.member.name}</Text>
-                  <Text className={styles.waitlistMeta}>
-                    近月参车 {p.member.recentSessionCount} 次 · {p.timeSlots.length}个时间可到
-                    {p.matchedRole && ` · ${roleLabels[p.matchedRole]}`}
-                  </Text>
-                </View>
-                {isPresident && (
-                  <View className={styles.waitlistActions}>
-                    <View
-                      className={classnames(styles.waitlistActionBtn, (p.waitlistRank || 1) <= 1 && styles.disabled)}
-                      onClick={() => (p.waitlistRank || 1) > 1 && handleMoveUp(p.waitlistRank!)}
-                    >
-                      ↑
-                    </View>
-                    <View
-                      className={classnames(styles.waitlistActionBtn, (p.waitlistRank || 0) >= game.waitlist.length && styles.disabled)}
-                      onClick={() => (p.waitlistRank || 0) < game.waitlist.length && handleMoveDown(p.waitlistRank!)}
-                    >
-                      ↓
-                    </View>
-                    {hasSlots && (
-                      <View className={styles.promoteBtn} onClick={() => handlePromote(p.waitlistRank!)}>
-                        提拔
+            {game.waitlist.map(p => {
+              const rec = recommendations.find(r => r.participant.memberId === p.memberId)
+              return (
+                <View key={p.memberId} className={styles.waitlistItem}>
+                  <View className={styles.waitlistRank}>#{p.waitlistRank}</View>
+                  <Image className={styles.waitlistAvatar} src={p.member.avatar} mode='aspectFill' />
+                  <View className={styles.waitlistInfo}>
+                    <Text className={styles.waitlistName}>{p.member.name}</Text>
+                    <Text className={styles.waitlistMeta}>
+                      近月参车 {p.member.recentSessionCount} 次 · {p.timeSlots.length}个时间可到
+                    </Text>
+                    {rec && rec.reasons.length > 0 && (
+                      <View className={styles.waitlistReasons}>
+                        {rec.reasons.slice(0, 3).map((reason, idx) => (
+                          <View key={idx} className={classnames(styles.waitlistReasonTag, idx === 0 && rec.matchedGap && 'primary')}>
+                            {reason}
+                          </View>
+                        ))}
                       </View>
                     )}
                   </View>
-                )}
-              </View>
-            ))}
+                  {isPresident && (
+                    <View className={styles.waitlistActions}>
+                      <View
+                        className={classnames(styles.waitlistActionBtn, (p.waitlistRank || 1) <= 1 && styles.disabled)}
+                        onClick={() => (p.waitlistRank || 1) > 1 && handleMoveUp(p.waitlistRank!)}
+                      >
+                        ↑
+                      </View>
+                      <View
+                        className={classnames(styles.waitlistActionBtn, (p.waitlistRank || 0) >= game.waitlist.length && styles.disabled)}
+                        onClick={() => (p.waitlistRank || 0) < game.waitlist.length && handleMoveDown(p.waitlistRank!)}
+                      >
+                        ↓
+                      </View>
+                      {hasSlots && (
+                        <View className={styles.promoteBtn} onClick={() => handlePromote(p.waitlistRank!)}>
+                          提拔
+                        </View>
+                      )}
+                    </View>
+                  )}
+                </View>
+              )
+            })}
           </View>
         )}
 
