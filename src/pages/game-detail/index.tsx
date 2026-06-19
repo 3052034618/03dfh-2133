@@ -7,6 +7,14 @@ import StatusBadge from '@/components/StatusBadge'
 import TagBadge from '@/components/TagBadge'
 import { useClubStore } from '@/store'
 import { formatDate } from '@/utils/format'
+import type { RoleType, TimeSlot } from '@/types/game'
+
+const roleLabels: Record<RoleType, string> = {
+  timeline: '时间线位',
+  cipher: '密码题位',
+  mentor: '带新位',
+  hardcore: '硬核推理位'
+}
 
 const GameDetailPage: React.FC = () => {
   const router = useRouter()
@@ -20,9 +28,11 @@ const GameDetailPage: React.FC = () => {
   const moveWaitlistUp = useClubStore(s => s.moveWaitlistUp)
   const moveWaitlistDown = useClubStore(s => s.moveWaitlistDown)
   const promoteWaitlist = useClubStore(s => s.promoteWaitlist)
+  const confirmGameTime = useClubStore(s => s.confirmGameTime)
 
   const game = useMemo(() => games.find(g => g.id === gameId), [games, gameId])
   const [selectedTimeSlots, setSelectedTimeSlots] = useState<string[]>([])
+  const [selectedConfirmTime, setSelectedConfirmTime] = useState<string | null>(null)
 
   const isConfirmed = useMemo(() => {
     return game?.participants.some(p => p.memberId === currentUserId) ?? false
@@ -38,6 +48,30 @@ const GameDetailPage: React.FC = () => {
 
   const isFull = (game?.currentPlayers ?? 0) >= (game?.totalPlayers ?? 0)
   const progress = game ? Math.min(100, (game.currentPlayers / game.totalPlayers) * 100) : 0
+
+  const roleFilledCounts = useMemo(() => {
+    if (!game) return {} as Record<RoleType, number>
+    const counts: Record<string, number> = {}
+    game.roleRequirements.forEach(r => { counts[r.type] = 0 })
+    game.participants.forEach(p => {
+      if (p.matchedRole && counts[p.matchedRole] !== undefined) {
+        counts[p.matchedRole]++
+      }
+    })
+    return counts as Record<RoleType, number>
+  }, [game])
+
+  const timeSlotCounts = useMemo(() => {
+    if (!game) return {} as Record<string, number>
+    const counts: Record<string, number> = {}
+    game.availableTimeSlots.forEach(t => { counts[t.id] = 0 })
+    game.participants.forEach(p => {
+      p.timeSlots.forEach(ts => {
+        if (counts[ts] !== undefined) counts[ts]++
+      })
+    })
+    return counts
+  }, [game])
 
   if (!game) {
     return <View className={styles.page}><Text style={{ padding: '100rpx', textAlign: 'center', color: '#86909C' }}>未找到该车辆</Text></View>
@@ -143,6 +177,28 @@ const GameDetailPage: React.FC = () => {
     Taro.showToast({ title: '分享功能开发中', icon: 'none' })
   }
 
+  const handleConfirmTime = () => {
+    if (!selectedConfirmTime) {
+      Taro.showToast({ title: '请先选择一个时间段', icon: 'none' })
+      return
+    }
+    const timeSlot = game.availableTimeSlots.find(t => t.id === selectedConfirmTime)
+    if (!timeSlot) return
+
+    Taro.showModal({
+      title: '确认开车时间',
+      content: `确定将《${game.title}》的开车时间确定为：\n${timeSlot.label} ${timeSlot.time}？\n\n确认后所有报名者和候补都会收到通知。`,
+      confirmText: '确认时间',
+      confirmColor: '#00B42A',
+      success: (res) => {
+        if (res.confirm) {
+          confirmGameTime(game.id, selectedConfirmTime)
+          Taro.showToast({ title: '时间已确认！', icon: 'success' })
+        }
+      }
+    })
+  }
+
   const hasSlots = game.participants.length < game.totalPlayers
 
   return (
@@ -222,7 +278,97 @@ const GameDetailPage: React.FC = () => {
           </View>
         </View>
 
-        {!isConfirmed && !isWaitlist && (
+        {game.roleRequirements.length > 0 && (
+          <View className={styles.roleRequirementSection}>
+            <View className={styles.roleRequirementTitle}>
+              <Text className={styles.roleRequirementTitleIcon}>🎯</Text>
+              角色需求配置
+            </View>
+            <Text style={{ fontSize: '24rpx', color: '#86909C', marginBottom: '24rpx', display: 'block' }}>
+              以下是该车需要的角色类型，匹配对应专长的社员在候补排序中会优先
+            </Text>
+            <View className={styles.roleList}>
+              {game.roleRequirements.map(req => {
+                const filled = roleFilledCounts[req.type] || 0
+                const need = req.count
+                const isFullRole = filled >= need
+                const percent = Math.min(100, (filled / need) * 100)
+                return (
+                  <View key={req.type} className={styles.roleItem}>
+                    <View className={styles.roleItemInfo}>
+                      <Text className={styles.roleItemName}>{req.label}</Text>
+                      <Text className={styles.roleItemDesc}>{req.description}</Text>
+                    </View>
+                    <View className={styles.roleItemProgress}>
+                      <Text className={classnames(styles.roleItemCount, isFullRole ? 'full' : 'need')}>
+                        {filled}/{need}人
+                      </Text>
+                      <View className={styles.roleProgressBar}>
+                        <View
+                          className={classnames(styles.roleProgressFill, !isFullRole && 'need')}
+                          style={{ width: `${percent}%` }}
+                        />
+                      </View>
+                    </View>
+                  </View>
+                )
+              })}
+            </View>
+          </View>
+        )}
+
+        {isPresident && !game.confirmedTime && (
+          <View className={styles.timeConfirmSection}>
+            <View className={styles.timeConfirmTitle}>
+              <Text className={styles.timeConfirmTitleIcon}>✅</Text>
+              确定最终开车时间
+            </View>
+            <Text style={{ fontSize: '24rpx', color: '#86909C', marginBottom: '24rpx', display: 'block' }}>
+              从已报名成员的可选时间中挑选一个，确认后所有人都会收到通知
+            </Text>
+            <View className={styles.timeOptionList}>
+              {game.availableTimeSlots.map(slot => {
+                const count = timeSlotCounts[slot.id] || 0
+                const isConfirmedSlot = game.confirmedTimeSlotId === slot.id
+                const isSelected = selectedConfirmTime === slot.id
+                return (
+                  <View
+                    key={slot.id}
+                    className={classnames(styles.timeOptionItem, isSelected && styles.selected, isConfirmedSlot && styles.confirmed)}
+                    onClick={() => !isConfirmedSlot && setSelectedConfirmTime(slot.id)}
+                  >
+                    <View className={classnames(styles.timeOptionRadio, isSelected && styles.selected, isConfirmedSlot && styles.confirmed)}>
+                      {(isSelected || isConfirmedSlot) && (
+                        <View className={classnames(styles.timeOptionRadioInner, isConfirmedSlot && styles.confirmed)} />
+                      )}
+                    </View>
+                    <View className={styles.timeOptionInfo}>
+                      <Text className={styles.timeOptionLabel}>{slot.label}</Text>
+                      <Text className={styles.timeOptionTime}>{slot.time}</Text>
+                    </View>
+                    <Text className={classnames(styles.timeOptionCount, isConfirmedSlot && styles.confirmed)}>
+                      {isConfirmedSlot ? '✓ 已确认' : `${count}人可到`}
+                    </Text>
+                  </View>
+                )
+              })}
+            </View>
+            {selectedConfirmTime && (
+              <Button
+                className={classnames(styles.confirmTimeBtn, !selectedConfirmTime && styles.disabled)}
+                onClick={handleConfirmTime}
+              >
+                确认此时间
+              </Button>
+            )}
+            <Text className={styles.presidentNote}>
+              <Text className={styles.presidentNoteIcon}>💡</Text>
+              社长模式：选择一个时间段确认后，车辆状态变为"已成车"，集合提醒将自动展示
+            </Text>
+          </View>
+        )}
+
+        {!isConfirmed && !isWaitlist && !game.confirmedTime && (
           <View className={styles.timeSlotSection}>
             <View className={styles.infoSectionTitle}>
               <Text className={styles.infoSectionIcon}>⏰</Text>
@@ -271,6 +417,9 @@ const GameDetailPage: React.FC = () => {
                 />
                 <Text className={styles.participantName}>{p.member.name}</Text>
                 {p.role && <Text className={styles.participantRole}>{p.role}</Text>}
+                {p.matchedRole && !p.role && (
+                  <Text className={styles.participantRole}>{roleLabels[p.matchedRole]}</Text>
+                )}
               </View>
             ))}
             {Array.from({ length: game.totalPlayers - game.participants.length }).map((_, idx) => (
@@ -293,7 +442,7 @@ const GameDetailPage: React.FC = () => {
               </Text>
             </View>
             <View className={styles.sortHint}>
-              排序规则：最近参车次数少的优先 → 时间线/密码题专长匹配 → 报名时间先后
+              排序规则：最近参车次数少的优先 → 角色需求匹配 → 时间线/密码题专长 → 报名时间先后
             </View>
             {game.waitlist.map(p => (
               <View key={p.memberId} className={styles.waitlistItem}>
@@ -303,6 +452,7 @@ const GameDetailPage: React.FC = () => {
                   <Text className={styles.waitlistName}>{p.member.name}</Text>
                   <Text className={styles.waitlistMeta}>
                     近月参车 {p.member.recentSessionCount} 次 · {p.timeSlots.length}个时间可到
+                    {p.matchedRole && ` · ${roleLabels[p.matchedRole]}`}
                   </Text>
                 </View>
                 {isPresident && (

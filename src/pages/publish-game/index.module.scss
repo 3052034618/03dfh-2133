@@ -270,3 +270,114 @@
   display: flex;
   align-items: center;
 }
+
+.roleRequirementList {
+  display: flex;
+  flex-direction: column;
+  gap: $spacing-sm;
+  margin-bottom: $spacing-md;
+}
+
+.roleRequirementItem {
+  display: flex;
+  align-items: center;
+  background: $color-bg-hover;
+  border-radius: $radius-md;
+  padding: $spacing-sm $spacing-md;
+}
+
+.roleCheckbox {
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 8rpx;
+  border: 3rpx solid $color-border;
+  margin-right: $spacing-md;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all $transition-fast;
+
+  &.active {
+    background: $color-primary;
+    border-color: $color-primary;
+  }
+}
+
+.roleCheckIcon {
+  color: $color-text-white;
+  font-size: 24rpx;
+  font-weight: bold;
+}
+
+.roleInfo {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4rpx;
+}
+
+.roleName {
+  font-size: $font-size-md;
+  color: $color-text-primary;
+  font-weight: $font-weight-medium;
+}
+
+.roleDesc {
+  font-size: $font-size-xs;
+  color: $color-text-tertiary;
+}
+
+.roleCounter {
+  display: flex;
+  align-items: center;
+  gap: $spacing-sm;
+  flex-shrink: 0;
+}
+
+.roleCounterBtn {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: $radius-round;
+  background: $color-primary;
+  color: $color-text-white;
+  font-size: $font-size-lg;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all $transition-fast;
+
+  &.disabled {
+    background: $color-text-disabled;
+  }
+
+  &:active {
+    opacity: 0.85;
+  }
+}
+
+.roleCounterValue {
+  font-size: $font-size-lg;
+  font-weight: $font-weight-bold;
+  color: $color-primary;
+  min-width: 48rpx;
+  text-align: center;
+}
+
+.addRoleBtn {
+  @include button-reset;
+  width: 100%;
+  height: 72rpx;
+  background: rgba(0, 180, 42, 0.08);
+  border: 2rpx dashed $color-success;
+  border-radius: $radius-md;
+  color: $color-success;
+  font-size: $font-size-sm;
+  font-weight: $font-weight-medium;
+  transition: all $transition-fast;
+
+  &:active {
+    opacity: 0.85;
+    background: rgba(0, 180, 42, 0.15);
+  }
+}

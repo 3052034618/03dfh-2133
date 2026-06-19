@@ -5,15 +5,27 @@ import classnames from 'classnames'
 import styles from './index.module.scss'
 import { useClubStore } from '@/store'
 import type { GameType } from '@/types/member'
+import type { RoleRequirement, RoleType } from '@/types/game'
 
 const gameTypes: GameType[] = [
   '硬核推理', '本格推理', '变格推理', '情感本', '机制本', '恐怖本', '欢乐本'
+]
+
+const availableRoles: { type: RoleType; label: string; description: string }[] = [
+  { type: 'timeline', label: '时间线位', description: '擅长梳理复杂时间线' },
+  { type: 'cipher', label: '密码题位', description: '擅长破解密码和谜题' },
+  { type: 'mentor', label: '带新位', description: '适合带新人熟悉规则' },
+  { type: 'hardcore', label: '硬核推理位', description: '耐6小时+长本' }
 ]
 
 interface TimeSlotForm {
   id: string
   label: string
   time: string
+}
+
+interface RoleForm extends RoleRequirement {
+  enabled: boolean
 }
 
 const PublishGamePage: React.FC = () => {
@@ -31,6 +43,12 @@ const PublishGamePage: React.FC = () => {
   const [timeSlots, setTimeSlots] = useState<TimeSlotForm[]>([
     { id: '1', label: '周六下午', time: '14:00' },
     { id: '2', label: '周六晚上', time: '19:00' }
+  ])
+  const [roles, setRoles] = useState<RoleForm[]>([
+    { type: 'timeline', label: '时间线位', description: '擅长梳理复杂时间线', count: 1, enabled: true },
+    { type: 'cipher', label: '密码题位', description: '擅长破解密码和谜题', count: 1, enabled: true },
+    { type: 'mentor', label: '带新位', description: '适合带新人熟悉规则', count: 1, enabled: false },
+    { type: 'hardcore', label: '硬核推理位', description: '耐6小时+长本', count: 1, enabled: true }
   ])
 
   const canSubmit = title && selectedType && location && aaFee && timeSlots.length > 0
@@ -52,6 +70,20 @@ const PublishGamePage: React.FC = () => {
 
   const updateTimeSlot = (id: string, field: 'label' | 'time', value: string) => {
     setTimeSlots(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t))
+  }
+
+  const toggleRole = (type: RoleType) => {
+    console.log('[PublishGame] toggle role:', type)
+    setRoles(prev => prev.map(r => r.type === type ? { ...r, enabled: !r.enabled } : r))
+  }
+
+  const changeRoleCount = (type: RoleType, delta: number) => {
+    console.log('[PublishGame] changeRoleCount:', type, delta)
+    setRoles(prev => prev.map(r => {
+      if (r.type !== type) return r
+      const newCount = Math.max(1, Math.min(10, r.count + delta))
+      return { ...r, count: newCount }
+    }))
   }
 
   const handleCancel = () => {
@@ -86,7 +118,8 @@ const PublishGamePage: React.FC = () => {
       confirmText: '确认发布',
       success: (res) => {
         if (res.confirm) {
-          console.log('[PublishGame] submit to store')
+          const roleRequirements = roles.filter(r => r.enabled).map(({ enabled, ...rest }) => rest)
+          console.log('[PublishGame] submit to store, roles:', roleRequirements)
           addGame({
             title,
             type: selectedType as GameType,
@@ -97,7 +130,8 @@ const PublishGamePage: React.FC = () => {
             noSpoilerNotice,
             availableTimeSlots: validTimeSlots,
             sessionDate,
-            description
+            description,
+            roleRequirements
           })
           Taro.showToast({ title: '发布成功！', icon: 'success' })
           setTimeout(() => Taro.navigateBack(), 800)
@@ -243,6 +277,49 @@ const PublishGamePage: React.FC = () => {
             <Button className={styles.addTimeSlotBtn} onClick={addTimeSlot}>
               + 添加时间段
             </Button>
+          </View>
+        </View>
+
+        <View className={styles.formCard}>
+          <View className={styles.formSectionTitle}>
+            <Text className={styles.formSectionIcon}>🎯</Text>
+            角色需求配置
+          </View>
+          <Text style={{ fontSize: '24rpx', color: '#86909C', marginBottom: '24rpx', display: 'block' }}>
+            勾选需要的角色类型并设置人数，候补排序会优先匹配角色需求
+          </Text>
+          <View className={styles.roleRequirementList}>
+            {roles.map(role => (
+              <View key={role.type} className={styles.roleRequirementItem}>
+                <View
+                  className={classnames(styles.roleCheckbox, role.enabled && styles.active)}
+                  onClick={() => toggleRole(role.type)}
+                >
+                  {role.enabled && <Text className={styles.roleCheckIcon}>✓</Text>}
+                </View>
+                <View className={styles.roleInfo}>
+                  <Text className={styles.roleName}>{role.label}</Text>
+                  <Text className={styles.roleDesc}>{role.description}</Text>
+                </View>
+                {role.enabled && (
+                  <View className={styles.roleCounter}>
+                    <View
+                      className={classnames(styles.roleCounterBtn, role.count <= 1 && styles.disabled)}
+                      onClick={() => role.count > 1 && changeRoleCount(role.type, -1)}
+                    >
+                      -
+                    </View>
+                    <Text className={styles.roleCounterValue}>{role.count}</Text>
+                    <View
+                      className={classnames(styles.roleCounterBtn, role.count >= 10 && styles.disabled)}
+                      onClick={() => role.count < 10 && changeRoleCount(role.type, 1)}
+                    >
+                      +
+                    </View>
+                  </View>
+                )}
+              </View>
+            ))}
           </View>
         </View>
 

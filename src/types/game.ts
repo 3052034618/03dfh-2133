@@ -2,6 +2,15 @@ import type { Member, GameType } from './member'
 
 export type GameStatus = 'recruiting' | 'confirmed' | 'full' | 'cancelled'
 
+export type RoleType = 'timeline' | 'cipher' | 'mentor' | 'hardcore'
+
+export interface RoleRequirement {
+  type: RoleType
+  label: string
+  count: number
+  description: string
+}
+
 export interface TimeSlot {
   id: string
   label: string
@@ -16,6 +25,7 @@ export interface Participant {
   status: 'confirmed' | 'waitlist'
   waitlistRank?: number
   role?: string
+  matchedRole?: RoleType
 }
 
 export interface Game {
@@ -34,11 +44,13 @@ export interface Game {
   status: GameStatus
   availableTimeSlots: TimeSlot[]
   confirmedTime?: string
+  confirmedTimeSlotId?: string
   participants: Participant[]
   waitlist: Participant[]
   publishTime: string
   sessionDate: string
   description?: string
+  roleRequirements: RoleRequirement[]
 }
 
 export interface CreateGameForm {
@@ -52,4 +64,5 @@ export interface CreateGameForm {
   availableTimeSlots: { label: string; time: string }[]
   sessionDate: string
   description?: string
+  roleRequirements: RoleRequirement[]
 }

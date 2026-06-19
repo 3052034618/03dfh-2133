@@ -34,7 +34,13 @@ export const mockGames: Game[] = [
     ],
     publishTime: '2026-06-18 09:00',
     sessionDate: '2026-06-21',
-    description: '经典本格硬核推理本，三重密室反转，适合喜欢烧脑推理的同学。DM全程跟进，保证体验。'
+    description: '经典本格硬核推理本，三重密室反转，适合喜欢烧脑推理的同学。DM全程跟进，保证体验。',
+    roleRequirements: [
+      { type: 'timeline', label: '时间线位', count: 2, description: '擅长梳理复杂时间线' },
+      { type: 'cipher', label: '密码题位', count: 1, description: '擅长破解密码和谜题' },
+      { type: 'hardcore', label: '硬核推理位', count: 2, description: '耐6小时+长本' },
+      { type: 'mentor', label: '带新位', count: 1, description: '适合带新人熟悉规则' }
+    ]
   },
   {
     id: 'g2',
@@ -66,7 +72,12 @@ export const mockGames: Game[] = [
     waitlist: [],
     publishTime: '2026-06-17 09:00',
     sessionDate: '2026-06-21',
-    description: '经典硬核本，层层递进的逻辑链，细节控狂喜。预计时长6-7小时。'
+    description: '经典硬核本，层层递进的逻辑链，细节控狂喜。预计时长6-7小时。',
+    roleRequirements: [
+      { type: 'timeline', label: '时间线位', count: 2, description: '擅长梳理复杂时间线' },
+      { type: 'cipher', label: '密码题位', count: 2, description: '擅长破解密码和谜题' },
+      { type: 'hardcore', label: '硬核推理位', count: 2, description: '耐6小时+长本' }
+    ]
   },
   {
     id: 'g3',
@@ -94,7 +105,12 @@ export const mockGames: Game[] = [
     waitlist: [],
     publishTime: '2026-06-19 08:00',
     sessionDate: '2026-06-21',
-    description: '微恐变格推理，新手友好，氛围拉满。预计时长4-5小时。'
+    description: '微恐变格推理，新手友好，氛围拉满。预计时长4-5小时。',
+    roleRequirements: [
+      { type: 'timeline', label: '时间线位', count: 1, description: '擅长梳理时间线' },
+      { type: 'mentor', label: '带新位', count: 2, description: '适合带新人熟悉规则' },
+      { type: 'hardcore', label: '硬核推理位', count: 1, description: '主推理位' }
+    ]
   },
   {
     id: 'g4',
@@ -129,7 +145,13 @@ export const mockGames: Game[] = [
     ],
     publishTime: '2026-06-18 13:00',
     sessionDate: '2026-06-22',
-    description: '日式妖怪背景的硬核推理本，诡计精巧，逻辑闭环。口碑神作！'
+    description: '日式妖怪背景的硬核推理本，诡计精巧，逻辑闭环。口碑神作！',
+    roleRequirements: [
+      { type: 'timeline', label: '时间线位', count: 2, description: '擅长梳理复杂时间线' },
+      { type: 'cipher', label: '密码题位', count: 1, description: '擅长破解密码和谜题' },
+      { type: 'hardcore', label: '硬核推理位', count: 2, description: '耐6小时+长本' },
+      { type: 'mentor', label: '带新位', count: 2, description: '适合带新人熟悉规则' }
+    ]
   },
   {
     id: 'g5',
@@ -160,6 +182,11 @@ export const mockGames: Game[] = [
     waitlist: [],
     publishTime: '2026-06-19 14:00',
     sessionDate: '2026-06-21',
-    description: '超级欢乐机制本，搞钱为主，推理为辅。适合团建和新朋友破冰！新手也能玩。'
+    description: '超级欢乐机制本，搞钱为主，推理为辅。适合团建和新朋友破冰！新手也能玩。',
+    roleRequirements: [
+      { type: 'mentor', label: '带新位', count: 3, description: '适合带新人熟悉规则' },
+      { type: 'hardcore', label: '硬核推理位', count: 1, description: '负责关键推理' },
+      { type: 'timeline', label: '时间线位', count: 1, description: '梳理机制时间线' }
+    ]
   }
 ]
