@@ -12,7 +12,7 @@ interface MemberUpdateData {
   note?: Partial<MemberNote>
 }
 
-const getRoleMatchScore = (member: Member, roleType: RoleType): number => {
+export const getRoleMatchScore = (member: Member, roleType: RoleType): number => {
   switch (roleType) {
     case 'timeline':
       return member.ability.timelineExpert ? 1 : 0
@@ -27,7 +27,7 @@ const getRoleMatchScore = (member: Member, roleType: RoleType): number => {
   }
 }
 
-const getBestMatchedRole = (member: Member, requirements: RoleRequirement[]): RoleType | undefined => {
+export const getBestMatchedRole = (member: Member, requirements: RoleRequirement[]): RoleType | undefined => {
   let bestRole: RoleType | undefined
   let bestScore = -1
   for (const req of requirements) {
@@ -40,15 +40,46 @@ const getBestMatchedRole = (member: Member, requirements: RoleRequirement[]): Ro
   return bestScore > 0 ? bestRole : undefined
 }
 
-const getFilledRoleCounts = (participants: Participant[], requirements: RoleRequirement[]): Record<RoleType, number> => {
-  const counts: Record<string, number> = {}
-  requirements.forEach(r => { counts[r.type] = 0 })
+export const getFilledRoleCounts = (participants: Participant[], requirements: RoleRequirement[]): Record<RoleType, number> => {
+  const filled: Record<string, number> = {}
+  requirements.forEach(r => { filled[r.type] = 0 })
   participants.forEach(p => {
-    if (p.matchedRole && counts[p.matchedRole] !== undefined) {
-      counts[p.matchedRole]++
+    const matchedRole = getBestMatchedRole(p.member, requirements)
+    if (matchedRole && filled[matchedRole] < requirements.find(r => r.type === matchedRole)!.count) {
+      filled[matchedRole]++
     }
   })
-  return counts as Record<RoleType, number>
+  return filled as Record<RoleType, number>
+}
+
+const getBestMatchedRoleForGap = (
+  member: Member,
+  requirements: RoleRequirement[],
+  gapCounts: Record<RoleType, number>
+): RoleType | undefined => {
+  let bestRole: RoleType | undefined
+  let bestScore = -1
+  for (const req of requirements) {
+    if (gapCounts[req.type] <= 0) continue
+    const score = getRoleMatchScore(member, req.type)
+    if (score > bestScore) {
+      bestScore = score
+      bestRole = req.type
+    }
+  }
+  return bestScore > 0 ? bestRole : undefined
+}
+
+const computeGapCounts = (
+  participants: Participant[],
+  requirements: RoleRequirement[]
+): Record<RoleType, number> => {
+  const filled = getFilledRoleCounts(participants, requirements)
+  const gaps: Record<string, number> = {}
+  requirements.forEach(r => {
+    gaps[r.type] = r.count - filled[r.type]
+  })
+  return gaps as Record<RoleType, number>
 }
 
 interface ClubStore {
@@ -76,6 +107,7 @@ interface ClubStore {
   recomputeWaitlistRank: (gameId: string) => void
 
   addNotification: (memberId: string, type: NotificationType, title: string, content: string, gameId?: string, metadata?: Record<string, any>) => void
+  getMyNotifications: () => Notification[]
   markNotificationRead: (notificationId: string) => void
   markAllNotificationsRead: () => void
   getUnreadCount: () => number
@@ -88,12 +120,18 @@ const getPlayCountLevel = (count: number): PlayCountLevel => {
   return '50+'
 }
 
-const sortWaitlist = (waitlist: Participant[], requirements: RoleRequirement[]): Participant[] => {
+const sortWaitlist = (
+  waitlist: Participant[],
+  requirements: RoleRequirement[],
+  participants: Participant[]
+): Participant[] => {
+  const gapCounts = computeGapCounts(participants, requirements)
+
   return [...waitlist].sort((a, b) => {
-    const aRoleMatch = getBestMatchedRole(a.member, requirements)
-    const bRoleMatch = getBestMatchedRole(b.member, requirements)
-    const aRoleScore = aRoleMatch ? getRoleMatchScore(a.member, aRoleMatch) * 10 : 0
-    const bRoleScore = bRoleMatch ? getRoleMatchScore(b.member, bRoleMatch) * 10 : 0
+    const aRoleMatch = getBestMatchedRoleForGap(a.member, requirements, gapCounts)
+    const bRoleMatch = getBestMatchedRoleForGap(b.member, requirements, gapCounts)
+    const aRoleScore = aRoleMatch ? getRoleMatchScore(a.member, aRoleMatch) * 50 : 0
+    const bRoleScore = bRoleMatch ? getRoleMatchScore(b.member, bRoleMatch) * 50 : 0
 
     const scoreA = a.member.recentSessionCount * 100 + aRoleScore
       + (a.member.ability.timelineExpert ? 1 : 0) + (a.member.ability.cipherExpert ? 1 : 0)
@@ -103,7 +141,8 @@ const sortWaitlist = (waitlist: Participant[], requirements: RoleRequirement[]):
     if (scoreA !== scoreB) return scoreA - scoreB
     return new Date(a.signupTime).getTime() - new Date(b.signupTime).getTime()
   }).map((p, idx) => {
-    const matchedRole = getBestMatchedRole(p.member, requirements)
+    const gapCountsNow = computeGapCounts(participants, requirements)
+    const matchedRole = getBestMatchedRoleForGap(p.member, requirements, gapCountsNow)
     return { ...p, waitlistRank: idx + 1, matchedRole }
   })
 }
@@ -111,10 +150,10 @@ const sortWaitlist = (waitlist: Participant[], requirements: RoleRequirement[]):
 const recomputeGameStatus = (game: Game): Game => {
   let status: GameStatus = game.status
   if (game.status !== 'cancelled') {
-    if (game.currentPlayers >= game.totalPlayers && game.participants.length >= game.totalPlayers) {
-      status = 'full'
-    } else if (game.confirmedTime) {
+    if (game.confirmedTime) {
       status = 'confirmed'
+    } else if (game.currentPlayers >= game.totalPlayers && game.participants.length >= game.totalPlayers) {
+      status = 'full'
     } else {
       status = 'recruiting'
     }
@@ -122,11 +161,24 @@ const recomputeGameStatus = (game: Game): Game => {
   return { ...game, status }
 }
 
+const recomputeParticipantsRoles = (game: Game): Game => {
+  const newParticipants = game.participants.map(p => ({
+    ...p,
+    matchedRole: getBestMatchedRole(p.member, game.roleRequirements)
+  }))
+  const newWaitlist = sortWaitlist(game.waitlist, game.roleRequirements, newParticipants)
+  return { ...game, participants: newParticipants, waitlist: newWaitlist }
+}
+
+const initializeMockGames = (games: Game[]): Game[] => {
+  return games.map(g => recomputeParticipantsRoles(recomputeGameStatus(g)))
+}
+
 const initialNotifications: Notification[] = []
 
 export const useClubStore = create<ClubStore>((set, get) => ({
   members: JSON.parse(JSON.stringify(mockMembers)),
-  games: JSON.parse(JSON.stringify(mockGames)),
+  games: initializeMockGames(JSON.parse(JSON.stringify(mockGames))),
   currentUserId: initialUserId,
   isPresident: true,
   notifications: initialNotifications,
@@ -156,20 +208,21 @@ export const useClubStore = create<ClubStore>((set, get) => ({
         }
       })
 
-      const newGames = state.games.map(g => ({
-        ...g,
-        host: g.host.id === memberId ? newMembers.find(m => m.id === memberId)! : g.host,
-        participants: g.participants.map(p => ({
-          ...p,
-          member: p.member.id === memberId ? newMembers.find(m => m.id === memberId)! : p.member,
-          matchedRole: p.member.id === memberId ? getBestMatchedRole(newMembers.find(m => m.id === memberId)!, g.roleRequirements) : p.matchedRole
-        })),
-        waitlist: g.waitlist.map(p => ({
-          ...p,
-          member: p.member.id === memberId ? newMembers.find(m => m.id === memberId)! : p.member,
-          matchedRole: p.member.id === memberId ? getBestMatchedRole(newMembers.find(m => m.id === memberId)!, g.roleRequirements) : p.matchedRole
-        }))
-      }))
+      const newGames = state.games.map(g => {
+        const updatedGame = {
+          ...g,
+          host: g.host.id === memberId ? newMembers.find(m => m.id === memberId)! : g.host,
+          participants: g.participants.map(p => ({
+            ...p,
+            member: p.member.id === memberId ? newMembers.find(m => m.id === memberId)! : p.member
+          })),
+          waitlist: g.waitlist.map(p => ({
+            ...p,
+            member: p.member.id === memberId ? newMembers.find(m => m.id === memberId)! : p.member
+          }))
+        }
+        return recomputeParticipantsRoles(updatedGame)
+      })
 
       return { members: newMembers, games: newGames }
     })
@@ -295,17 +348,18 @@ export const useClubStore = create<ClubStore>((set, get) => ({
         }
 
         if (isFull) {
-          const newWaitlist = sortWaitlist([...g.waitlist, { ...newParticipant, waitlistRank: g.waitlist.length + 1 }], g.roleRequirements)
+          const newWaitlist = sortWaitlist([...g.waitlist, { ...newParticipant, waitlistRank: g.waitlist.length + 1 }], g.roleRequirements, g.participants)
           const rank = newWaitlist.find(p => p.memberId === memberId)?.waitlistRank
           result = { success: true, isWaitlist: true, waitlistRank: rank }
           return recomputeGameStatus({ ...g, waitlist: newWaitlist })
         } else {
           result = { success: true, isWaitlist: false }
-          return recomputeGameStatus({
+          const updatedGame = recomputeGameStatus({
             ...g,
             currentPlayers: g.currentPlayers + 1,
             participants: [...g.participants, newParticipant]
           })
+          return recomputeParticipantsRoles(updatedGame)
         }
       })
 
@@ -336,7 +390,7 @@ export const useClubStore = create<ClubStore>((set, get) => ({
             const promoted = { ...newWaitlist[0], status: 'confirmed' as const }
             delete promoted.waitlistRank
             newParticipants.push(promoted)
-            newWaitlist = sortWaitlist(newWaitlist.slice(1), g.roleRequirements)
+            newWaitlist = sortWaitlist(newWaitlist.slice(1), g.roleRequirements, newParticipants)
             newCurrentPlayers += 1
 
             addNotification(
@@ -363,14 +417,15 @@ export const useClubStore = create<ClubStore>((set, get) => ({
             })
           }
 
-          return recomputeGameStatus({
+          const updatedGame = recomputeGameStatus({
             ...g,
             currentPlayers: newCurrentPlayers,
             participants: newParticipants,
             waitlist: newWaitlist
           })
+          return recomputeParticipantsRoles(updatedGame)
         } else {
-          const newWaitlist = sortWaitlist(g.waitlist.filter(p => p.memberId !== memberId), g.roleRequirements)
+          const newWaitlist = sortWaitlist(g.waitlist.filter(p => p.memberId !== memberId), g.roleRequirements, g.participants)
 
           newWaitlist.forEach((p, idx) => {
             const oldRank = p.waitlistRank
@@ -409,7 +464,8 @@ export const useClubStore = create<ClubStore>((set, get) => ({
         const promoted: Participant = { ...toPromote, status: 'confirmed' }
         delete promoted.waitlistRank
 
-        const newWaitlist = sortWaitlist(g.waitlist.filter(p => p.waitlistRank !== waitlistRank), g.roleRequirements)
+        const newParticipants = [...g.participants, promoted]
+        const newWaitlist = sortWaitlist(g.waitlist.filter(p => p.waitlistRank !== waitlistRank), g.roleRequirements, newParticipants)
 
         addNotification(
           toPromote.memberId,
@@ -434,12 +490,13 @@ export const useClubStore = create<ClubStore>((set, get) => ({
           }
         })
 
-        return recomputeGameStatus({
+        const updatedGame = recomputeGameStatus({
           ...g,
           currentPlayers: g.currentPlayers + 1,
-          participants: [...g.participants, promoted],
+          participants: newParticipants,
           waitlist: newWaitlist
         })
+        return recomputeParticipantsRoles(updatedGame)
       })
       return { games: newGames }
     })
@@ -537,7 +594,7 @@ export const useClubStore = create<ClubStore>((set, get) => ({
     set(state => {
       const newGames = state.games.map(g => {
         if (g.id !== gameId) return g
-        return { ...g, waitlist: sortWaitlist(g.waitlist, g.roleRequirements) }
+        return { ...g, waitlist: sortWaitlist(g.waitlist, g.roleRequirements, g.participants) }
       })
       return { games: newGames }
     })
@@ -550,6 +607,7 @@ export const useClubStore = create<ClubStore>((set, get) => ({
       notifications: [
         {
           id: `n${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+          memberId,
           type,
           title,
           content,
@@ -564,10 +622,16 @@ export const useClubStore = create<ClubStore>((set, get) => ({
     }))
   },
 
+  getMyNotifications: () => {
+    const { notifications, currentUserId } = get()
+    return notifications.filter(n => n.memberId === currentUserId).slice(0, 10)
+  },
+
   markNotificationRead: (notificationId: string) => {
+    const { currentUserId } = get()
     set(state => ({
       notifications: state.notifications.map(n =>
-        n.id === notificationId ? { ...n, read: true } : n
+        n.id === notificationId && n.memberId === currentUserId ? { ...n, read: true } : n
       )
     }))
   },
@@ -575,12 +639,14 @@ export const useClubStore = create<ClubStore>((set, get) => ({
   markAllNotificationsRead: () => {
     const { currentUserId } = get()
     set(state => ({
-      notifications: state.notifications.map(n => ({ ...n, read: true }))
+      notifications: state.notifications.map(n =>
+        n.memberId === currentUserId ? { ...n, read: true } : n
+      )
     }))
   },
 
   getUnreadCount: () => {
     const { notifications, currentUserId } = get()
-    return notifications.filter(n => !n.read).length
+    return notifications.filter(n => !n.read && n.memberId === currentUserId).length
   }
 }))

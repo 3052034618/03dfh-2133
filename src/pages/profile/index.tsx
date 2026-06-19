@@ -19,7 +19,7 @@ const ProfilePage: React.FC = () => {
   const currentMember = useClubStore(s => s.getCurrentMember())
   const games = useClubStore(s => s.games)
   const currentUserId = useClubStore(s => s.currentUserId)
-  const notifications = useClubStore(s => s.notifications)
+  const getMyNotifications = useClubStore(s => s.getMyNotifications)
   const markAllNotificationsRead = useClubStore(s => s.markAllNotificationsRead)
   const markNotificationRead = useClubStore(s => s.markNotificationRead)
   const getUnreadCount = useClubStore(s => s.getUnreadCount)
@@ -56,11 +56,11 @@ const ProfilePage: React.FC = () => {
     return tags
   }, [currentMember])
 
-  const unreadCount = useMemo(() => getUnreadCount(), [notifications])
+  const unreadCount = useMemo(() => getUnreadCount(), [getUnreadCount])
 
   const myNotifications = useMemo(() => {
-    return notifications.slice(0, 10)
-  }, [notifications])
+    return getMyNotifications()
+  }, [getMyNotifications, games])
 
   const formatNotificationTime = (isoStr: string) => {
     const date = new Date(isoStr)

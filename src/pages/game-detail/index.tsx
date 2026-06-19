@@ -5,7 +5,7 @@ import classnames from 'classnames'
 import styles from './index.module.scss'
 import StatusBadge from '@/components/StatusBadge'
 import TagBadge from '@/components/TagBadge'
-import { useClubStore } from '@/store'
+import { useClubStore, getFilledRoleCounts, getBestMatchedRole } from '@/store'
 import { formatDate } from '@/utils/format'
 import type { RoleType, TimeSlot } from '@/types/game'
 
@@ -51,14 +51,7 @@ const GameDetailPage: React.FC = () => {
 
   const roleFilledCounts = useMemo(() => {
     if (!game) return {} as Record<RoleType, number>
-    const counts: Record<string, number> = {}
-    game.roleRequirements.forEach(r => { counts[r.type] = 0 })
-    game.participants.forEach(p => {
-      if (p.matchedRole && counts[p.matchedRole] !== undefined) {
-        counts[p.matchedRole]++
-      }
-    })
-    return counts as Record<RoleType, number>
+    return getFilledRoleCounts(game.participants, game.roleRequirements)
   }, [game])
 
   const timeSlotCounts = useMemo(() => {
@@ -407,21 +400,24 @@ const GameDetailPage: React.FC = () => {
             已确认名单 ({game.participants.length}/{game.totalPlayers})
           </View>
           <View className={styles.participantList}>
-            {game.participants.map(p => (
-              <View key={p.memberId} className={styles.participantItem}>
-                <Image
-                  className={styles.participantAvatar}
-                  src={p.member.avatar}
-                  mode='aspectFill'
-                  onError={(e) => console.error('[GameDetail] participant avatar error:', e)}
-                />
-                <Text className={styles.participantName}>{p.member.name}</Text>
-                {p.role && <Text className={styles.participantRole}>{p.role}</Text>}
-                {p.matchedRole && !p.role && (
-                  <Text className={styles.participantRole}>{roleLabels[p.matchedRole]}</Text>
-                )}
-              </View>
-            ))}
+            {game.participants.map(p => {
+              const matchedRole = getBestMatchedRole(p.member, game.roleRequirements)
+              return (
+                <View key={p.memberId} className={styles.participantItem}>
+                  <Image
+                    className={styles.participantAvatar}
+                    src={p.member.avatar}
+                    mode='aspectFill'
+                    onError={(e) => console.error('[GameDetail] participant avatar error:', e)}
+                  />
+                  <Text className={styles.participantName}>{p.member.name}</Text>
+                  {p.role && <Text className={styles.participantRole}>{p.role}</Text>}
+                  {matchedRole && !p.role && (
+                    <Text className={styles.participantRole}>{roleLabels[matchedRole]}</Text>
+                  )}
+                </View>
+              )
+            })}
             {Array.from({ length: game.totalPlayers - game.participants.length }).map((_, idx) => (
               <View key={`empty-${idx}`} className={styles.participantItem}>
                 <View className={styles.participantAvatar} style={{ background: '#F2F3F5', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
